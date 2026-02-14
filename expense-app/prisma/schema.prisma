@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String          @id @default(uuid())
+  email           String          @unique
+  password        String
+  name            String
+  role            String          @default("EMPLOYEE")
+  department      String          @default("General")
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  expenses        Expense[]
+  reports         ExpenseReport[] @relation("ReportOwner")
+  reviewedReports ExpenseReport[] @relation("ReportReviewer")
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  active   Boolean   @default(true)
+  expenses Expense[]
+}
+
+model Expense {
+  id          String              @id @default(uuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id])
+  amount      Float
+  currency    String              @default("CLP")
+  categoryId  String
+  category    Category            @relation(fields: [categoryId], references: [id])
+  merchant    String
+  date        DateTime
+  description String              @default("")
+  status      String              @default("DRAFT")
+  receiptPath String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  reportItems ExpenseReportItem[]
+}
+
+model ExpenseReport {
+  id           String              @id @default(uuid())
+  userId       String
+  user         User                @relation("ReportOwner", fields: [userId], references: [id])
+  title        String
+  status       String              @default("DRAFT")
+  submittedAt  DateTime?
+  reviewedById String?
+  reviewedBy   User?               @relation("ReportReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  items        ExpenseReportItem[]
+}
+
+model ExpenseReportItem {
+  id        String        @id @default(uuid())
+  reportId  String
+  report    ExpenseReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  expenseId String
+  expense   Expense       @relation(fields: [expenseId], references: [id])
+
+  @@unique([reportId, expenseId])
+}
