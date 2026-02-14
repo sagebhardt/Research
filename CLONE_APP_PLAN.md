@@ -1,340 +1,223 @@
-# Plan: Clone Rindegastos Expense Management Platform
+# Plan: Internal Expense Management App
 
 ## Overview
 
-Rindegastos is a Latin American SaaS expense management platform serving 4,500+ companies. It lets employees submit expenses via mobile receipt capture (with AI/OCR), routes them through customizable approval workflows, enforces company policies, detects fraud/duplicates, and integrates with ERPs for accounting. It has a marketing site, a web app, and mobile apps.
-
-This plan covers building a white-label clone of the full platform for your company.
+Build an internal expense management web app for your company, inspired by Rindegastos. Employees submit expenses with receipt photos, managers approve/reject them, and finance exports the data. No marketing site, no multi-tenancy, no public-facing pages — just the app.
 
 ---
 
-## Architecture
+## Stage 1: Proof of Concept
+
+**Goal:** A working web app where employees can submit expenses with receipts, managers can approve/reject them, and admins can view reports. Keep it simple — single Next.js full-stack app, SQLite for zero-config dev, file system for receipt storage.
+
+### Architecture (Simple)
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Frontend Layer                     │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │ Marketing │  │   Web App    │  │  Mobile App   │  │
-│  │   Site    │  │  (React/     │  │  (React       │  │
-│  │ (Next.js) │  │   Next.js)   │  │   Native)     │  │
-│  └──────────┘  └──────────────┘  └───────────────┘  │
-└────────────────────────┬────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────┐
-│                    API Layer                         │
-│            Node.js / Express or NestJS               │
-│         REST API + WebSocket (notifications)         │
-└────────────────────────┬────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────┐
-│                  Service Layer                        │
-│  ┌────────┐ ┌──────────┐ ┌──────┐ ┌─────────────┐  │
-│  │  Auth  │ │ Expense  │ │ OCR  │ │  Reporting   │  │
-│  │Service │ │ Service  │ │Svc   │ │  Service     │  │
-│  └────────┘ └──────────┘ └──────┘ └─────────────┘  │
-│  ┌────────┐ ┌──────────┐ ┌──────┐ ┌─────────────┐  │
-│  │ Policy │ │ Approval │ │ Fund │ │ Integration  │  │
-│  │Service │ │ Workflow │ │Mgmt  │ │  Service     │  │
-│  └────────┘ └──────────┘ └──────┘ └─────────────┘  │
-└────────────────────────┬────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────┐
-│                  Data Layer                           │
-│  ┌────────────┐ ┌────────────┐ ┌──────────────────┐ │
-│  │ PostgreSQL │ │   Redis    │ │    S3/Blob       │ │
-│  │ (primary)  │ │  (cache)   │ │  (receipts)      │ │
-│  └────────────┘ └────────────┘ └──────────────────┘ │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────┐
+│   Next.js App (Full-Stack)   │
+│  ┌────────┐  ┌────────────┐  │
+│  │  UI    │  │  API Routes │  │
+│  │(React) │  │  (Server)   │  │
+│  └────────┘  └────────────┘  │
+└──────────────┬───────────────┘
+               │
+┌──────────────▼───────────────┐
+│   SQLite (via Prisma ORM)    │
+│   + local file storage       │
+│     for receipt images       │
+└──────────────────────────────┘
 ```
 
-**Recommended Tech Stack:**
-- **Frontend:** Next.js 14+ (App Router) with TypeScript, Tailwind CSS, shadcn/ui
-- **Mobile:** React Native with Expo
-- **Backend:** NestJS (TypeScript) — structured, modular, enterprise-ready
-- **Database:** PostgreSQL with Prisma ORM
-- **Cache:** Redis
-- **File Storage:** AWS S3 or equivalent (for receipt images)
-- **OCR:** Google Cloud Vision API or AWS Textract (for receipt scanning)
-- **Auth:** NextAuth.js + SSO (SAML/OIDC) support
-- **Deployment:** Docker + AWS/GCP/Azure (or Vercel for frontend)
-- **CI/CD:** GitHub Actions
+**Tech Stack:**
+- **App:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **ORM:** Prisma with SQLite (swap to Postgres later with zero code changes)
+- **Auth:** NextAuth.js (email/password)
+- **File Storage:** Local `/uploads` directory (swap to S3 later)
+- **Deployment:** Single Docker container or `npm start` on a server
 
----
+### 1.1 Project Scaffolding
+- Initialize Next.js project with TypeScript + Tailwind + shadcn/ui
+- Set up Prisma with SQLite
+- Set up NextAuth.js with credentials provider
+- Seed script with sample users (admin, manager, employee)
 
-## Phase 1: Foundation & Marketing Site
+### 1.2 Database Schema
 
-### 1.1 Project Setup
-- Initialize monorepo (Turborepo or Nx)
-- Set up shared TypeScript config, ESLint, Prettier
-- Configure CI/CD pipeline (lint, test, build)
-- Set up Docker Compose for local development (Postgres, Redis)
-
-### 1.2 Marketing/Landing Site (Next.js)
-Recreate the Rindegastos-style marketing site with your company branding:
-
-**Pages to build:**
-- **Homepage** — Hero with value proposition ("Digitize 100% of your company's expense reports"), feature highlights, social proof (client count/logos), testimonials, CTA ("Request a Demo" / "Start Free Trial")
-- **Product page** — Feature sections: Mobile App, Receipt Scanning (OCR), Policy Management, Approval Workflows, Fund Management, GPS Distance Tracking, Fraud Detection, Reporting, ERP Integrations
-- **Pricing page** — Tiered pricing table (Starter/Business/Corporate/Enterprise) with feature comparison matrix
-- **Contact/Demo Request page** — Lead capture form (Name, Email, Company, Phone, Number of Employees, Message), connected to a CRM or email notification
-- **Clients/Testimonials page** — Logo grid, case studies, testimonial quotes
-- **Blog** — CMS-backed blog (use MDX or a headless CMS like Sanity/Strapi)
-
-**Key components:**
-- Responsive navigation bar with dropdowns (Product, Solutions, Pricing, Resources)
-- Hero sections with illustrations/screenshots
-- Feature cards with icons
-- Pricing comparison table
-- Contact/demo request form with validation
-- Footer with sitemap links, social links, legal links
-- Cookie consent banner
-- SEO metadata, Open Graph tags, structured data
-
-### 1.3 Contact Form Backend
-- Form submission API endpoint
-- Email notification (SendGrid/AWS SES) to sales team
-- Optional: HubSpot/Salesforce CRM integration
-- Rate limiting and spam protection (reCAPTCHA)
-
----
-
-## Phase 2: Authentication & User Management
-
-### 2.1 Auth System
-- Email/password registration and login
-- Email verification flow
-- Password reset flow
-- SSO integration (SAML 2.0 / OIDC) for corporate accounts
-- Multi-factor authentication (TOTP)
-- Session management with JWT + refresh tokens
-
-### 2.2 Organization & User Management
-- Organization (company/tenant) creation and setup
-- Role-based access control: Admin, Finance Manager, Approver, Employee
-- User invitation flow (email invite to join organization)
-- User profile management
-- Organization settings (branding, currency, timezone, locale)
-
-### 2.3 Database Schema (Core)
 ```
-Organization
-├── Users (with roles)
-├── Departments
-├── Cost Centers
-├── Ledger Accounts
-├── Expense Policies
-├── Approval Workflows
-├── Funds
-└── Currency Settings
+User
+  id, email, password, name, role (ADMIN | MANAGER | EMPLOYEE), department
+
+Expense
+  id, userId, amount, currency, category, merchant, date, description, status (DRAFT | SUBMITTED | APPROVED | REJECTED), receiptPath, createdAt, updatedAt
+
+ExpenseReport
+  id, userId, title, status (DRAFT | SUBMITTED | APPROVED | REJECTED), submittedAt, reviewedBy, reviewedAt, reviewNote
+
+ExpenseReportItem  (join table)
+  id, reportId, expenseId
+
+Category
+  id, name (Travel, Meals, Office Supplies, Transportation, etc.)
 ```
 
----
+### 1.3 Core Pages & Features
 
-## Phase 3: Core Expense Management
+**Employee views:**
+- **Dashboard** — Summary of recent expenses, pending reports, quick stats
+- **Create Expense** — Form: amount, date, category (dropdown), merchant, description, receipt upload (image). Save as draft or add to a report
+- **My Expenses** — List/table of all expenses with status filters, search
+- **Create Report** — Select expenses to group into a report, add title, submit for approval
+- **My Reports** — List of reports with status
 
-### 3.1 Expense Creation
-- Manual expense entry form (amount, date, category, merchant, description, currency)
-- Receipt image upload with drag-and-drop
-- OCR receipt scanning (Scanit equivalent):
-  - Upload photo or take photo (mobile)
-  - Extract merchant name, date, total, tax, line items via OCR API
-  - Auto-populate expense form fields from OCR results
-  - Allow manual correction of extracted data
-- Multi-currency support with automatic exchange rate lookup (via Open Exchange Rates API or similar)
-- Expense categories (configurable per organization)
-- Attachment support (multiple receipts per expense)
+**Manager views:**
+- **Approval Queue** — List of submitted reports pending review, click to see full detail with all expenses and receipt images
+- **Approve/Reject** — One-click approve or reject with optional comment
 
-### 3.2 Expense Reports
-- Group multiple expenses into a report
-- Report submission workflow
-- Report summary with totals by category, date range
-- PDF export of expense reports
-- Draft/submitted/approved/rejected status tracking
+**Admin views:**
+- **All Expenses** — Filterable table of all expenses across the company
+- **All Reports** — Filterable table of all reports
+- **User Management** — Add/edit/deactivate users, assign roles
+- **Category Management** — Add/edit expense categories
+- **Export** — Download expenses as CSV/Excel, filtered by date range, department, status
 
-### 3.3 GPS Distance Tracking
-- Google Maps integration for mileage/distance expenses
-- Start/end location entry with autocomplete
-- Automatic distance calculation and cost estimation
-- Configurable per-km/per-mile rate
+### 1.4 Receipt Handling (Simple)
+- Image upload on expense creation (accept jpg/png/pdf)
+- Store in `/uploads/{userId}/{expenseId}/` directory
+- Display receipt thumbnail in expense detail view
+- No OCR yet — manual data entry only
 
-### 3.4 Offline Support (Mobile)
-- Queue expense submissions when offline
-- Sync when back online
-- Local storage of receipt photos
+### 1.5 Email Notifications (Basic)
+- Email to manager when a report is submitted
+- Email to employee when a report is approved/rejected
+- Use Nodemailer with company SMTP or a free tier (Resend, etc.)
 
----
+### 1.6 Deployment
+- Dockerize the app (single Dockerfile)
+- Deploy to a single VM or internal server
+- SQLite file persisted via Docker volume
 
-## Phase 4: Policies, Approvals & Controls
-
-### 4.1 Expense Policy Engine
-- Configurable rules per organization:
-  - Spending limits (per expense, per day, per category)
-  - Allowed expense categories
-  - Required fields and attachments
-  - Blacklisted merchants
-  - Time-based rules (submission deadlines)
-- Policy violation warnings (soft) and blocks (hard)
-- Policy assignment to departments/roles/users
-
-### 4.2 Approval Workflows
-- Configurable multi-level approval chains
-- Approval routing rules (by amount, category, department)
-- One-click approve/reject with comments
-- Automatic approval for expenses under threshold
-- Delegation (approve on behalf of)
-- Email and push notifications for pending approvals
-- Escalation rules for overdue approvals
-
-### 4.3 Fraud Detection & Validation
-- Duplicate expense detection algorithm (same amount + date + merchant)
-- Suspicious pattern detection (weekend expenses, round numbers, etc.)
-- Receipt authenticity checks
-- Flagging system with admin review queue
+### Stage 1 Deliverable
+A working app where employees log in, create expenses with receipts, bundle them into reports, submit for approval, and managers approve/reject. Admins can export data to CSV. Simple, functional, ready for real use.
 
 ---
 
-## Phase 5: Fund Management & Accounting
+## Stage 2: Production Hardening & Integrations
 
-### 5.1 Fund / Petty Cash Management
-- Create and assign funds to employees
-- Real-time balance tracking
-- Fund replenishment workflow
-- Submission deadlines with reminders
-- Fund reconciliation reports
+**Goal:** Take the proof of concept and make it production-grade — swap to a real database, add OCR, approval workflows, policy enforcement, ERP integration, and a mobile-friendly experience.
 
-### 5.2 Accounting Integration
-- Chart of accounts mapping
-- Cost center allocation
-- Ledger account assignment
-- Export to accounting formats (CSV, Excel, custom)
-- ERP integration connectors:
-  - SAP Business One
-  - Microsoft Dynamics
-  - Oracle
-  - QuickBooks
-  - Xero
-  - Generic API/webhook
+### Architecture (Production)
 
-### 5.3 Reporting & Analytics Dashboard
-- Executive dashboard with KPIs:
-  - Total spend by period
-  - Spend by category/department/employee
-  - Policy violation rate
-  - Average approval time
-  - Top spenders
-- Drill-down reports with filters
-- Scheduled report delivery (email)
-- Export to CSV/Excel/PDF
-- Custom report builder
+```
+┌─────────────────────────────────────────┐
+│            Next.js App                   │
+│  (responsive — works on mobile browser) │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│             API Routes                   │
+│  + background job queue (BullMQ/Redis)   │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  PostgreSQL  │  Redis  │  S3 / MinIO    │
+│  (data)      │ (queue) │ (receipts)     │
+└─────────────────────────────────────────┘
+```
 
----
+### 2.1 Infrastructure Upgrades
+- Migrate SQLite to PostgreSQL (Prisma makes this a config change)
+- Move receipt storage from local filesystem to S3 (or MinIO for on-prem)
+- Add Redis for background job queue
+- Set up proper backups and monitoring
 
-## Phase 6: Mobile Application
+### 2.2 OCR Receipt Scanning
+- Integrate Google Cloud Vision, AWS Textract, or Azure Form Recognizer
+- On receipt upload: extract merchant, date, total, tax automatically
+- Auto-fill expense form fields, allow manual correction
+- Background processing via job queue so uploads are non-blocking
 
-### 6.1 React Native App
-- Login / biometric authentication
-- Expense list and creation
-- Camera integration for receipt capture
-- Scanit-equivalent OCR scanning flow
-- Approval queue (approve/reject with swipe)
-- Push notifications
-- Offline mode with sync
-- GPS distance tracking
-- Fund balance view
-- Profile and settings
+### 2.3 Approval Workflows (Configurable)
+- Multi-level approval chains (e.g., team lead -> department head -> finance)
+- Routing rules: by amount threshold, department, category
+- Auto-approve expenses under a configurable limit
+- Delegation (approve on behalf of someone out of office)
+- Escalation for overdue approvals
 
----
+### 2.4 Expense Policies
+- Spending limits per category, per day, per expense
+- Required receipt for expenses above a threshold
+- Submission deadline enforcement
+- Duplicate detection (same amount + date + merchant)
+- Soft warnings vs. hard blocks
 
-## Phase 7: Notifications, Security & Polish
+### 2.5 Fund / Petty Cash Management
+- Assign fund balances to employees
+- Real-time tracking of remaining balance
+- Fund replenishment requests
+- Reconciliation reports
 
-### 7.1 Notification System
-- Email notifications (new expense, approval required, approved/rejected, policy violation)
-- Push notifications (mobile)
-- In-app notification center
-- Configurable notification preferences per user
+### 2.6 ERP & Accounting Integration
+- Export in formats your ERP expects (CSV, XML, API call)
+- Map expense categories to chart of accounts / cost centers / ledger accounts
+- Build specific connector for your company's ERP (SAP, Oracle, Dynamics, QuickBooks, Xero, etc.)
+- Webhook/API endpoint for external systems to pull approved expense data
 
-### 7.2 Security
-- Data encryption at rest (AES-256) and in transit (TLS 1.3)
-- Automated backups with point-in-time recovery
-- Audit trail logging (all actions tracked)
-- GDPR/privacy compliance
-- Penetration testing
-- Rate limiting, input sanitization, CSRF protection
+### 2.7 Reporting & Analytics
+- Dashboard with charts: spend by category, department, time period
+- Policy violation tracking
+- Average approval turnaround time
+- Top spenders
+- Scheduled email reports to finance team
+- Export to Excel/PDF
 
-### 7.3 Multi-tenancy
-- Tenant isolation at database level (schema-per-tenant or row-level security)
-- Custom branding per organization (logo, colors)
-- Custom domain support (white-label)
+### 2.8 Enhanced Auth & Security
+- SSO integration with your company's identity provider (SAML/OIDC — e.g., Okta, Azure AD, Google Workspace)
+- Multi-factor authentication
+- Audit trail (every action logged with who/what/when)
+- Role-based permissions refined (department-scoped managers, etc.)
 
----
+### 2.9 Mobile Experience
+- Ensure fully responsive design works well on phone browsers
+- Add PWA support (installable, works offline for viewing)
+- Camera integration for receipt capture directly from phone browser
+- Optional: build a React Native app if native feel is required
 
-## Phase 8: Deployment & Operations
-
-### 8.1 Infrastructure
-- Containerized deployment (Docker/Kubernetes)
-- Auto-scaling configuration
-- CDN for static assets (CloudFront/Cloudflare)
-- Database replication and failover
-- Monitoring and alerting (Datadog/Grafana/CloudWatch)
-- Logging (ELK stack or equivalent)
-
-### 8.2 Launch Checklist
-- Load testing
-- Security audit
-- Accessibility audit (WCAG 2.1 AA)
-- Browser/device testing matrix
-- Documentation (API docs, user guides)
-- Support system setup (help center, ticketing)
+### 2.10 Multi-Currency (if needed)
+- Support expenses in foreign currencies
+- Automatic exchange rate lookup
+- Convert to company base currency for reporting
 
 ---
 
-## Suggested Build Order (Priority)
-
-| Priority | Phase | Rationale |
-|----------|-------|-----------|
-| 1 | Phase 1 (Foundation + Marketing Site) | Get a public presence up, start collecting leads |
-| 2 | Phase 2 (Auth + User Management) | Required foundation for all app features |
-| 3 | Phase 3 (Core Expense Management) | The core value proposition |
-| 4 | Phase 4 (Policies + Approvals) | Key differentiator and enterprise requirement |
-| 5 | Phase 6 (Mobile App) | High user demand, receipt capture is mobile-first |
-| 6 | Phase 5 (Funds + Accounting) | Needed for enterprise customers |
-| 7 | Phase 7 (Notifications + Security) | Polish and production-readiness |
-| 8 | Phase 8 (Deployment + Ops) | Go-live |
-
----
-
-## File/Folder Structure (Monorepo)
+## Folder Structure
 
 ```
 expense-app/
-├── apps/
-│   ├── marketing/          # Next.js marketing site
-│   ├── web/                # Next.js web application
-│   ├── mobile/             # React Native (Expo) app
-│   └── api/                # NestJS backend API
-├── packages/
-│   ├── ui/                 # Shared UI component library
-│   ├── database/           # Prisma schema & migrations
-│   ├── config/             # Shared configs (TS, ESLint, etc.)
-│   ├── types/              # Shared TypeScript types
-│   └── utils/              # Shared utility functions
+├── src/
+│   ├── app/                  # Next.js App Router pages
+│   │   ├── (auth)/           # Login, register pages
+│   │   ├── dashboard/        # Employee dashboard
+│   │   ├── expenses/         # Create, list, detail
+│   │   ├── reports/          # Create, list, detail
+│   │   ├── approvals/        # Manager approval queue
+│   │   ├── admin/            # User mgmt, categories, export
+│   │   └── api/              # API routes
+│   ├── components/           # Shared UI components
+│   ├── lib/                  # Utilities, auth config, db client
+│   └── prisma/               # Schema, migrations, seed
+├── uploads/                  # Receipt images (Stage 1)
+├── Dockerfile
 ├── docker-compose.yml
-├── turbo.json
 ├── package.json
-└── README.md
+└── tsconfig.json
 ```
 
 ---
 
-## Key Decisions to Make Before Starting
+## Decisions Before Starting
 
-1. **Company branding** — Logo, color palette, company name for the product
-2. **Target market** — Which countries/regions? This affects tax compliance modules
-3. **OCR provider** — Google Cloud Vision vs. AWS Textract vs. Azure Form Recognizer
-4. **Hosting provider** — AWS vs. GCP vs. Azure vs. Vercel+Railway
-5. **CRM for leads** — HubSpot, Salesforce, or custom
-6. **ERP integrations** — Which ERPs do your target customers use?
-7. **Pricing model** — Per-user? Tiered? Flat-rate?
-8. **Mobile platforms** — iOS only, Android only, or both?
-9. **Localization** — Which languages from day one?
-10. **Compliance** — Which tax authorities to integrate with?
+1. **Your company's ERP** — Which system does finance use? (Needed for Stage 2 export format)
+2. **Auth preference** — Company SSO (Okta/Azure AD/Google) or simple email/password for PoC?
+3. **Hosting** — Internal server, cloud VM, or managed platform?
+4. **OCR provider** — Google Cloud Vision, AWS Textract, or Azure Form Recognizer? (Stage 2)
+5. **Currency** — Single currency or multi-currency from the start?
